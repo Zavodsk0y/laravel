@@ -16,6 +16,10 @@ RUN pecl install xdebug
 RUN docker-php-ext-enable xdebug
 RUN apk del -f .build-deps
 
+RUN apk add --no-cache npm
+
+WORKDIR /app/cloud
+
 COPY --from=composer/composer:latest-bin /composer /usr/bin/composer
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
