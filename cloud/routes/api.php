@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\ApiAuthController;
+use App\Http\Controllers\API\FileController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -26,3 +27,5 @@ Route::post('/registration', [ApiAuthController::class, 'register']);
 Route::post('/authorization', [ApiAuthController::class, 'authorization']);
 
 Route::get('/logout', [ApiAuthController::class, 'logout']);
+
+Route::post('/files', [FileController::class, 'uploadFiles']);
