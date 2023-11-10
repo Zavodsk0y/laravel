@@ -28,4 +28,9 @@ Route::post('/authorization', [ApiAuthController::class, 'authorization']);
 
 Route::get('/logout', [ApiAuthController::class, 'logout']);
 
-Route::post('/files', [FileController::class, 'uploadFiles']);
+Route::middleware('auth:sanctum')->post('/files', [FileController::class, 'uploadFiles']);
+
+Route::middleware('auth:sanctum')->delete('/files/{file_id}', [FileController::class, 'deleteFile']);
+
+
+

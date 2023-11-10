@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -30,7 +31,7 @@ class FileController extends Controller
                     $jsonResps[] = $response;
                 } else {
                     $fileId = Str::random(10);
-                    $uploadFile->store('uploads/');
+                    $uploadFile->storeAs('uploads/', $fileId);
 
                     $file = $uploadFile;
                     $file = new File([
@@ -67,4 +68,36 @@ class FileController extends Controller
 
         return $jsonResps;
     }
+
+    public function deleteFile($file_id)
+    {
+        $file = File::where('file_id', $file_id)->first();
+
+        if (!$file) {
+            return response()->json([
+                'success' => false,
+                'code' => 404,
+                'message' => 'Not found',
+            ], 404);
+        }
+
+        if ($file->user_id !== auth()->user()->id) {
+            return response()->json([
+                'success' => false,
+                'code' => 403,
+                'message' => 'Forbidden for you',
+            ], 403);
+        }
+
+        Storage::delete('uploads/' . $file->file_id);
+
+        $file->delete();
+
+        return response()->json([
+            'success' => true,
+            'code' => 200,
+            'message' => 'File deleted',
+        ], 200);
+    }
+
 }
