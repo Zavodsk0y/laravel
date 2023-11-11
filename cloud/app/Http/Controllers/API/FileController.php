@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\File;
+use App\Models\FileAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -52,6 +53,14 @@ class FileController extends Controller
                     ]);
 
                     $file->save();
+
+                    $fileAccess = new FileAccess([
+                        'user_id' => $user->id,
+                        'file_id' => $fileId,
+                        'type' => 'author',
+                    ]);
+
+                    $fileAccess->save();
 
                     $response = [
                         'success' => true,

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\API\ApiAuthController;
 use App\Http\Controllers\API\FileController;
+use App\Http\Controllers\API\FileAccessController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +36,8 @@ Route::middleware('auth:sanctum')->delete('/files/{file_id}', [FileController::c
 Route::middleware('auth:sanctum')->patch('/files/{file_id}', [FileController::class, 'updateFileName']);
 
 Route::middleware('auth:sanctum')->get('/files/{file_id}', [FileController::class, 'downloadFile']);
+
+Route::middleware('auth:sanctum')->post('files/{file_id}/accesses', [FileAccessController::class, 'addAccessToFile']);
 
 
 
