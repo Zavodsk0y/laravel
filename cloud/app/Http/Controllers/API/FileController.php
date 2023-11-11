@@ -28,16 +28,26 @@ class FileController extends Controller
                         'message' => $validator->errors()->first(),
                         'name' => $uploadFile->getClientOriginalName()
                     ];
-                    $jsonResps[] = $response;
                 } else {
                     $fileId = Str::random(10);
-                    $uploadFile->storeAs('uploads/', $fileId);
+
+                    $uploadFileName = $uploadFile->getClientOriginalName();
+                    $newFileName = $uploadFileName;
+                    $counter = 1;
+                    while (Storage::exists("uploads/{$newFileName}")) {
+                        $pathInfo = pathinfo($uploadFileName);
+                        $newFileName = $pathInfo['filename'] . " ({$counter})." . $pathInfo['extension'];
+                        $counter++;
+                    }
+
+
+                    $uploadFile->storeAs('uploads/', $newFileName);
 
                     $file = $uploadFile;
                     $file = new File([
                         'user_id' => $user->id,
                         'file_id' => $fileId,
-                        'name' => $file->getClientOriginalName(), // Имя файла
+                        'name' => $newFileName, // Имя файла
                     ]);
 
                     $file->save();
@@ -46,15 +56,14 @@ class FileController extends Controller
                         'success' => true,
                         'code' => 200,
                         'message' => 'Success',
-                        'name' => $uploadFile->getClientOriginalName(),
+                        'name' => $newFileName,
                         'url' => url('api/files/' . $fileId),
                         'file_id' => $fileId,
                     ];
 
-                    $jsonResps[] = $response;
-
 
                 }
+                $jsonResps[] = $response;
             }
         } else {
             return response()->json([
@@ -89,7 +98,7 @@ class FileController extends Controller
             ], 403);
         }
 
-        Storage::delete('uploads/' . $file->file_id);
+        Storage::delete('uploads/' . $file->name);
 
         $file->delete();
 
