@@ -32,5 +32,11 @@ Route::middleware('auth:sanctum')->post('/files', [FileController::class, 'uploa
 
 Route::middleware('auth:sanctum')->delete('/files/{file_id}', [FileController::class, 'deleteFile']);
 
+Route::middleware('auth:sanctum')->patch('/files/{file_id}', [FileController::class, 'updateFileName']);
+
+Route::middleware('auth:sanctum')->get('/files/{file_id}', [FileController::class, 'downloadFile']);
+
+
+
 
 
