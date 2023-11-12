@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::post('/registration', [ApiAuthController::class, 'register']);
-
 Route::post('/authorization', [ApiAuthController::class, 'authorization']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
