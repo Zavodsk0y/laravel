@@ -63,6 +63,8 @@ class FileController extends Controller
 
                     $fileId = Str::random(10);
 
+                    $pathInfo = pathinfo($uploadFileName);
+                    $extension = $pathInfo['extension'];
                     $uploadFile->storeAs('uploads', "$fileId.$extension");
 
                     $file = new File([
