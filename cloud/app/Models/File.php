@@ -19,4 +19,9 @@ class File extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function accesses()
+    {
+        return $this->hasMany(FileAccess::class, 'file_id', 'file_id');
+    }
 }

@@ -96,6 +96,7 @@ class ApiAuthController extends Controller
 
     public function logout(Request $request)
     {
+
         $user = $request->user();
 
         $user->tokens->each(function ($token) {

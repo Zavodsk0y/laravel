@@ -14,13 +14,13 @@ use Illuminate\Validation\ValidationException;
 
 class FileController extends Controller
 {
-    public function uploadFiles(Request $request): array|JsonResponse
+    public function uploadFiles(Request $request): JsonResponse
     {
         $files = $request->file('files');
         $user = auth()->user();
 
         if ($files) {
-            $jsonResps = [];
+            $responses = [];
             foreach ($files as $uploadFile) {
                 $rules = array('file' => 'required|file|mimes:doc,pdf,docx,zip,jpeg,jpg,png|max:2048', 'files.*' => 'required');
                 $validator = Validator::make(array('file' => $uploadFile), $rules);
@@ -32,33 +32,52 @@ class FileController extends Controller
                         'name' => $uploadFile->getClientOriginalName()
                     ];
                 } else {
-                    $fileId = Str::random(10);
-
                     $uploadFileName = $uploadFile->getClientOriginalName();
-                    $newFileName = $uploadFileName;
-                    $counter = 1;
-                    while (Storage::exists("uploads/$newFileName")) {
-                        $pathInfo = pathinfo($uploadFileName);
-                        $newFileName = $pathInfo['filename'] . " ($counter)." . $pathInfo['extension'];
-                        $counter++;
+
+                    $existingFile = File::where('name', $uploadFileName)
+                        ->where('user_id', $user->id)
+                        ->first();
+
+                    if ($existingFile) {
+                        $counter = 1;
+                        $newFileName = $uploadFileName;
+
+                        while (true) {
+                            $pathInfo = pathinfo($uploadFileName);
+                            $newFileName = $pathInfo['filename'] . " ($counter)." . $pathInfo['extension'];
+                            $extension = $pathInfo['extension'];
+
+                            $existingFile = File::where('name', $newFileName)
+                                ->where('user_id', $user->id)
+                                ->first();
+
+                            if (!$existingFile) {
+                                break;
+                            }
+
+                            $counter++;
+                        }
+                    } else {
+                        $newFileName = $uploadFileName;
                     }
 
+                    $fileId = Str::random(10);
 
-                    $uploadFile->storeAs('uploads/', $newFileName);
+                    $uploadFile->storeAs('uploads', "$fileId.$extension");
 
                     $file = new File([
                         'user_id' => $user->id,
                         'file_id' => $fileId,
-                        'name' => $newFileName, // Имя файла
+                        'name' => $newFileName,
                     ]);
-
-                    $file->save();
 
                     $fileAccess = new FileAccess([
                         'user_id' => $user->id,
                         'file_id' => $fileId,
-                        'type' => 'author',
+                        'type' => 'author'
                     ]);
+
+                    $file->save();
 
                     $fileAccess->save();
 
@@ -70,27 +89,27 @@ class FileController extends Controller
                         'url' => url('api/files/' . $fileId),
                         'file_id' => $fileId,
                     ];
-
-
                 }
-                $jsonResps[] = $response;
+
+                $responses[] = $response;
             }
         } else {
             return response()->json([
                 'success' => false,
                 'code' => 422,
                 'message' => [
-                    'files' => ['field files can not be blank'],
+                    'files' => ['field files cannot be blank'],
                 ],
             ], 422);
         }
 
-        return $jsonResps;
+        return response()->json($responses);
     }
 
-    public function deleteFile($file_id): JsonResponse
+
+    public function deleteFile($fileId): JsonResponse
     {
-        $file = File::where('file_id', $file_id)->first();
+        $file = File::where('file_id', $fileId)->first();
 
         if (!$file) {
             return response()->json([
@@ -108,7 +127,11 @@ class FileController extends Controller
             ], 403);
         }
 
-        Storage::delete('uploads/' . $file->name);
+        $pathinfo = pathinfo($file->name);
+        $extension = $pathinfo['extension'];
+        $fullname = $file->file_id . '.' . $extension;
+
+        Storage::delete("uploads/$fullname");
 
         $file->delete();
 
@@ -122,11 +145,11 @@ class FileController extends Controller
     public function updateFileName($file_id, Request $request): JsonResponse
     {
         $user = auth()->user();
-        $newFileName = $request->input('name');
 
-        $file = File::where('file_id', $file_id)
-            ->where('user_id', $user->id)
-            ->first();
+        $file = File::where('file_id', $file_id)->first();
+
+        $pathInfo = pathinfo($file->name);
+        $newFileName = $request->input('name') . '.' . $pathInfo['extension'];
 
         if (!$file) {
             return response()->json([
@@ -146,10 +169,9 @@ class FileController extends Controller
 
         $existingFile = File::where('name', $newFileName)
             ->where('user_id', $user->id)
-            ->where('id', '<>', $file->id)
             ->first();
 
-        if ($existingFile) {
+        if ($existingFile && $existingFile->id !== $file->id) {
             return response()->json([
                 'success' => false,
                 'code' => 422,
@@ -167,26 +189,22 @@ class FileController extends Controller
             return response()->json([
                 'success' => false,
                 'code' => 422,
-                'messsage' => $errors,
+                'message' => $errors,
             ], 422);
         }
-
-        $pathInfo = pathinfo($file->name);
-        $newFileName = $request->input('name') . '.' . $pathInfo['extension'];
-
-        Storage::move("uploads/$file->name", "uploads/$newFileName");
 
         $file->name = $newFileName;
         $file->save();
 
         return response()->json([
-            'success' => true,
-            'code' => 200,
-            'message' => 'Renamed',
-        ], 200);
+            "success" => true,
+            "code" => 200,
+            "message" => "Renamed"
+        ]);
     }
 
-    public function downloadFile($file_id)
+
+    public function downloadFile($file_id): JsonResponse
     {
         $user = auth()->user();
 
@@ -200,15 +218,26 @@ class FileController extends Controller
             ], 404);
         }
 
-        if ($file->user_id !== $user->id) {
+        $access = FileAccess::where('file_id', $file_id)
+            ->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->orWhere('type', 'co-author');
+            })
+            ->first();
+
+        if (!$access) {
             return response()->json([
                 'success' => false,
                 'code' => 403,
-                'message' => 'Access denied',
+                'message' => 'Forbidden for you',
             ], 403);
         }
 
-        $filePath = storage_path("app/uploads/$file->name");
+        $pathinfo = pathinfo($file->name);
+        $extension = $pathinfo['extension'];
+        $fullname = $file->file_id . '.' . $extension;
+
+        $filePath = storage_path("app/uploads/$fullname");
 
         if (!file_exists($filePath)) {
             return response()->json([
@@ -219,6 +248,63 @@ class FileController extends Controller
         }
 
         return response()->download($filePath);
+    }
+
+    public function getUserFiles(): JsonResponse
+    {
+        $user = auth()->user();
+
+        $files = File::where('user_id', $user->id)->with(['accesses.user'])->get();
+
+        $response = [];
+
+        foreach ($files as $file) {
+            $accesses = $file->accesses->map(function ($access) {
+                return [
+                    'fullname' => $access->user->first_name . ' ' . $access->user->last_name,
+                    'email' => $access->user->email,
+                    'type' => $access->type,
+                ];
+            });
+
+            $fileData = [
+                'file_id' => $file->file_id,
+                'name' => $file->name,
+                'code' => 200,
+                'url' => url("api/files/$file->file_id"),
+                'accesses' => $accesses,
+            ];
+
+            $response[] = $fileData;
+        }
+
+        return response()->json($response);
+    }
+
+    public function getAccessedFiles(): JsonResponse
+    {
+        $user = auth()->user();
+
+        $files = File::whereHas('accesses', function ($query) use ($user) {
+            $query->where('user_id', $user->id)
+                ->where('type', 'co-author');
+        })->get();
+
+
+        $response = [];
+
+        foreach ($files as $file) {
+            $fileData = [
+                'file_id' => $file->file_id,
+                'name' => $file->name,
+                'code' => 200,
+                'url' => url("api/files/$file->file_id")
+            ];
+
+            $response[] = $fileData;
+        }
+
+        return response()->json($response);
     }
 
 }
