@@ -36,6 +36,11 @@
     8. Примените миграции:
     
     php artisan migrate
+
+    9. При необходимости установите разрешения:
+
+    chmod -R ugo+rw storage
+    chmod -R ugo+rw cloud
  
 ```
 
