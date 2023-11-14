@@ -11,9 +11,11 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileController extends Controller
 {
+
     public function uploadFiles(Request $request): JsonResponse
     {
         $files = $request->file('files');
@@ -62,7 +64,6 @@ class FileController extends Controller
                     }
 
                     $fileId = Str::random(10);
-
                     $pathInfo = pathinfo($uploadFileName);
                     $extension = $pathInfo['extension'];
                     $uploadFile->storeAs('uploads', "$fileId.$extension");
@@ -205,8 +206,7 @@ class FileController extends Controller
         ]);
     }
 
-
-    public function downloadFile($file_id): JsonResponse
+    public function downloadFile($file_id): BinaryFileResponse|JsonResponse
     {
         $user = auth()->user();
 
