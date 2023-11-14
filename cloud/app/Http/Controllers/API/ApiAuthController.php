@@ -18,7 +18,7 @@ class ApiAuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         try {
-            $data = $request->json()->all(); // Получаем все данные из запроса
+            $data = $request->json()->all();
             $request->validate([
                 'email' => 'required|email|unique:users,email',
                 'password' => 'required|min:3|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
@@ -53,7 +53,7 @@ class ApiAuthController extends Controller
         ], 201);
     }
 
-    public function authorization(Request $request)
+    public function authorization(Request $request): JsonResponse
     {
         try {
             $data = $request->json()->all();
@@ -94,7 +94,7 @@ class ApiAuthController extends Controller
 
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
 
         $user = $request->user();
