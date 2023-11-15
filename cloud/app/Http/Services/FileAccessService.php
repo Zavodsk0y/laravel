@@ -39,6 +39,8 @@ class FileAccessService
             'type' => 'co-author'
         ]);
 
+        $newAccess->save();
+
         $fileAccesses = FileAccess::where('file_id', $file->file_id)->get();
 
         $usersWithAccess = [];
@@ -50,8 +52,6 @@ class FileAccessService
                 'code' => 200,
             ];
         }
-
-        $newAccess->save();
 
         return [
             'success' => true,

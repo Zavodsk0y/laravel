@@ -20,7 +20,7 @@ class FileController extends Controller
         $this->fileService = $fileService;
     }
 
-    public function uploadFiles(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $files = $request->file('files');
         $user = auth()->user();
@@ -36,14 +36,14 @@ class FileController extends Controller
     }
 
 
-    public function deleteFile($fileId): JsonResponse
+    public function destroy($fileId): JsonResponse
     {
         $response = $this->fileService->deleteFile($fileId);
 
         return response()->json($response, $response['code']);
     }
 
-    public function updateFileName($fileId, FilesUploadRequest $request): JsonResponse
+    public function update($fileId, FilesUploadRequest $request): JsonResponse
     {
         $user = auth()->user();
         $file = File::where('file_id', $fileId)->first();
@@ -55,7 +55,7 @@ class FileController extends Controller
         return response()->json($response, $response['code']);
     }
 
-    public function downloadFile($fileId): BinaryFileResponse|JsonResponse
+    public function show($fileId): BinaryFileResponse|JsonResponse
     {
         $file = File::where('file_id', $fileId)->first();
 
@@ -64,7 +64,7 @@ class FileController extends Controller
         return response()->download($response);
     }
 
-    public function getUserFiles(): JsonResponse
+    public function index(): JsonResponse
     {
         $user = auth()->user();
 

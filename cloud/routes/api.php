@@ -21,16 +21,12 @@ Route::post('/authorization', [ApiAuthController::class, 'authorization']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/logout', [ApiAuthController::class, 'logout']);
-    Route::post("/files", [FileController::class, 'uploadFiles']);
-    Route::delete("/files/{file_id}", [FileController::class, 'deleteFile']);
-    Route::patch("files/{file_id}", [FileController::class, 'updateFileName']);
-    Route::get('/files/disk', [FileController::class, 'getUserFiles']);
+    Route::get('/files/disk', [FileController::class, 'index']);
     Route::get('/files/shared', [FileController::class, 'getAccessedFiles']);
-    Route::get("/files/{file_id}", [FileController::class, 'downloadFile']);
+    Route::apiResource('/files', FileController::class)->except('index');
     Route::post("/files/{file_id}/accesses", [FileAccessController::class, 'addAccessToFile']);
     Route::delete('/files/{file_id}/accesses', [FileAccessController::class, 'deleteAccessToFile']);
 });
-
 
 
 
