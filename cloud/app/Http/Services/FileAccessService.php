@@ -57,7 +57,7 @@ class FileAccessService
             'success' => true,
             'code' => 200,
             'message' => 'Access granted',
-            'data' => $usersWithAccess,
+            'data' => $fileAccesses, // На доработке
         ];
     }
 

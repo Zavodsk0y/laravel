@@ -28,4 +28,19 @@ class LoginUserRequest extends FormRequest
             'password' => 'required'
         ];
     }
+
+    /**
+     * Получить сообщения об ошибках для определенных правил валидации.
+     *
+     * @return array
+     */
+    public function messages()
+    {
+        return [
+            'success' => false,
+            'email.required' => "Email field cannot be blank",
+            'password.required' => 'Password field cannot be blank',
+            'email.email' => 'Invalid email format'
+        ];
+    }
 }

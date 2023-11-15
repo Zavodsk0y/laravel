@@ -7,7 +7,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Validator;
 
-class FilesUploadRequest extends FormRequest
+class FilesUploadRequest extends ApiRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -27,7 +27,8 @@ class FilesUploadRequest extends FormRequest
     public function rules()
     {
         return [
-            'name' => 'required',
+            'files' => 'required',
+            'files.*' => 'mimes:doc,pdf,docx,zip,jpeg,jpg,png'
         ];
     }
 }

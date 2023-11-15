@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginUserRequest;
 use App\Http\Requests\RegisterUserRequest;
@@ -10,7 +11,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\HasApiTokens;
 
 class ApiAuthController extends Controller
@@ -28,48 +28,34 @@ class ApiAuthController extends Controller
             'last_name' => $data['last_name'],
         ]);
 
-        $tokenResult = $user->createToken('authToken');
-        $token = $tokenResult->plainTextToken;
-
         return response()->json([
             'success' => true,
             'code' => 201,
             'message' => 'Success',
-            'token' => $token,
+            'token' => $user->createToken('authToken')->plainTextToken
         ], 201);
     }
 
     public function authorization(LoginUserRequest $request): JsonResponse
     {
-        $credentials = request(['email', 'password']);
-
-        if (!Auth::attempt($credentials)) {
-            return response()->json([
-                'success' => false,
-                'code' => 401,
-                'message' => 'Authorization failed'
-            ], 401);
+        if (!Auth::attempt($request->only(['email', 'password']))) {
+            throw new ApiException(401, 'Authorization failed');
         }
 
         $user = $request->user();
-        $tokenResult = $user->createToken('authToken');
-        $token = $tokenResult->plainTextToken;
 
         return response()->json([
             'success' => true,
             'code' => 200,
             'message' => 'Success',
-            'token' => $token
+            'token' => $user->createToken('authToken')->plainTextToken
         ], 200);
 
     }
 
     public function logout(Request $request): JsonResponse
     {
-
-        $user = $request->user();
-
-        $user->tokens->each(function ($token) {
+        $request->user()->tokens->each(function ($token) {
             $token->delete();
         });
 

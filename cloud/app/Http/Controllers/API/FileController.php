@@ -8,6 +8,7 @@ use App\Http\Services\FileService;
 use App\Models\File;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileController extends Controller
@@ -23,12 +24,11 @@ class FileController extends Controller
     public function store(Request $request): JsonResponse
     {
         $files = $request->file('files');
-        $user = auth()->user();
 
         $responses = [];
 
         foreach ($files as $uploadFile) {
-            $response = $this->fileService->processFile($uploadFile, $user);
+            $response = $this->fileService->processFile($uploadFile);
             $responses[] = $response;
         }
 
@@ -40,17 +40,14 @@ class FileController extends Controller
     {
         $response = $this->fileService->deleteFile($fileId);
 
-        return response()->json($response, $response['code']);
+        return response()->json($response);
     }
 
-    public function update($fileId, FilesUploadRequest $request): JsonResponse
+    public function update($fileId, Request $request): JsonResponse
     {
-        $user = auth()->user();
-        $file = File::where('file_id', $fileId)->first();
-        $newFileName = $request->input('name') . '.' . pathinfo($file->name)['extension'];
+        $newFileName = $request->input('name');
 
-
-        $response = $this->fileService->updateFileName($newFileName, $fileId, $user);
+        $response = $this->fileService->updateFileName($newFileName, $fileId);
 
         return response()->json($response, $response['code']);
     }
@@ -77,14 +74,7 @@ class FileController extends Controller
 
     public function getAccessedFiles(): JsonResponse
     {
-        $user = auth()->user();
-
-        $files = File::whereHas('accesses', function ($query) use ($user) {
-            $query->where('user_id', $user->id)
-                ->where('type', 'co-author');
-        })->get();
-
-        $response = $this->fileService->getAccessedFiles($files);
+        $response = $this->fileService->getAccessedFiles();
 
         return response()->json($response);
     }

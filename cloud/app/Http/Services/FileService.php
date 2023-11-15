@@ -2,8 +2,11 @@
 
 namespace App\Http\Services;
 
+use App\Exceptions\ApiException;
+use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Models\FileAccess;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -11,7 +14,7 @@ use Illuminate\Support\Str;
 
 class FileService
 {
-    public function processFile($uploadFile, $user): array
+    public function processFile($uploadFile)
     {
         $validationError = $this->validateFile($uploadFile);
 
@@ -26,11 +29,11 @@ class FileService
         $uploadFileName = $uploadFile->getClientOriginalName();
 
         $existingFile = File::where('name', $uploadFileName)
-            ->where('user_id', $user->id)
+            ->where('user_id', Auth::id())
             ->first();
 
         if ($existingFile) {
-            $uploadFileName = $this->makeUniqueFileName($uploadFileName, $user->id);
+            $uploadFileName = $this->makeUniqueFileName($uploadFileName, Auth::id());
         }
 
         $fileId = Str::random(10);
@@ -40,48 +43,35 @@ class FileService
         $uploadFile->storeAs('uploads', "$fileId.$extension");
 
         $file = new File([
-            'user_id' => $user->id,
+            'user_id' => Auth::id(),
             'file_id' => $fileId,
             'name' => $uploadFileName,
         ]);
 
         $fileAccess = new FileAccess([
-            'user_id' => $user->id,
+            'user_id' => Auth::id(),
             'file_id' => $fileId,
             'type' => 'author',
         ]);
 
+        $data[] = $file;
+
         $file->save();
         $fileAccess->save();
 
-        return [
-            'success' => true,
-            'code' => 200,
-            'message' => 'Success',
-            'name' => $uploadFileName,
-            'url' => url("api/files/$fileId"),
-            'file_id' => $fileId,
-        ];
+        return FileResource::collection($data);
     }
 
-    public function deleteFile($fileId): array
+    public function deleteFile($fileId)
     {
         $file = File::where('file_id', $fileId)->first();
 
         if (!$file) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'Not found',
-            ];
+            throw new ApiException(404, 'File not found');
         }
 
-        if ($file->user_id !== auth()->user()->id) {
-            return [
-                'success' => false,
-                'code' => 403,
-                'message' => 'Forbidden for you',
-            ];
+        if ($file->user_id !== Auth::id()) {
+            throw new ApiException(403, 'Forbidden for you');
         }
 
         $pathinfo = pathinfo($file->name);
@@ -99,28 +89,20 @@ class FileService
         ];
     }
 
-    public function updateFileName($newFileName, $fileId, $user): array
+    public function updateFileName($newFileName, $fileId): array
     {
         $file = File::where('file_id', $fileId)->first();
 
         if (!$file) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'File not found',
-            ];
+            throw new ApiException(404, 'File not found');
         }
 
-        if ($file->user_id !== $user->id) {
-            return [
-                'success' => false,
-                'code' => 403,
-                'message' => 'Forbidden for you',
-            ];
+        if ($file->user_id !== Auth::id()) {
+            throw new ApiException(403, 'Forbidden for you');
         }
 
         $existingFile = File::where('name', $newFileName)
-            ->where('user_id', $user->id)
+            ->where('user_id', Auth::id())
             ->first();
 
         if ($existingFile && $existingFile->id !== $file->id) {
@@ -131,13 +113,14 @@ class FileService
             ];
         }
 
-        $file->name = $newFileName;
+        $ext = pathinfo($file->name, PATHINFO_EXTENSION);
+        $file->name = "$newFileName.$ext";
         $file->save();
 
         return [
             "success" => true,
             "code" => 200,
-            "message" => "Renamed"
+            "message" => "Renamed",
         ];
     }
 
@@ -146,11 +129,7 @@ class FileService
         $user = auth()->user();
 
         if (!$file) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'File not found',
-            ];
+            throw new ApiException(404, 'File not found');
         }
 
         $access = FileAccess::where('file_id', $fileId)
@@ -161,11 +140,7 @@ class FileService
             ->first();
 
         if (!$access) {
-            return [
-                'success' => false,
-                'code' => 403,
-                'message' => 'Forbidden for you',
-            ];
+            throw new ApiException(403, 'Forbidden for you');
         }
 
         $pathinfo = pathinfo($file->name);
@@ -175,11 +150,7 @@ class FileService
         $filePath = storage_path("app/uploads/$fullname");
 
         if (!file_exists($filePath)) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'File not found on server',
-            ];
+            throw new ApiException(404, 'File not found on server');
         }
 
         return $filePath;
@@ -212,8 +183,15 @@ class FileService
         return $response;
     }
 
-    public function getAccessedFiles($files)
+    public function getAccessedFiles()
     {
+        $user = Auth::user();
+
+        $files = File::whereHas('accesses', function ($query) use ($user) {
+            $query->where('user_id', $user->id)
+                ->where('type', 'co-author');
+        })->get();
+
         $response = [];
 
         foreach ($files as $file) {
@@ -233,9 +211,8 @@ class FileService
     protected function makeUniqueFileName($fileName, $userId): string
     {
         $counter = 1;
-        $newFileName = $fileName;
 
-        while (true) {
+        do {
             $pathInfo = pathinfo($fileName);
             $newFileName = $pathInfo['filename'] . " ($counter)." . $pathInfo['extension'];
 
@@ -243,12 +220,8 @@ class FileService
                 ->where('user_id', $userId)
                 ->first();
 
-            if (!$existingFile) {
-                break;
-            }
-
             $counter++;
-        }
+        } while ($existingFile);
 
         return $newFileName;
     }
