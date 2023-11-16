@@ -3,22 +3,16 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\FilesUploadRequest;
 use App\Http\Services\FileService;
 use App\Models\File;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileController extends Controller
 {
-
-    protected $fileService;
-
-    public function __construct(FileService $fileService)
+    public function __construct(protected FileService $fileService)
     {
-        $this->fileService = $fileService;
     }
 
     public function store(Request $request): JsonResponse
@@ -38,7 +32,11 @@ class FileController extends Controller
 
     public function destroy($fileId): JsonResponse
     {
-        $response = $this->fileService->deleteFile($fileId);
+        $file = File::where('file_id', $fileId)->first();
+
+        $this->authorize('fileAccess', $file);
+
+        $response = $this->fileService->deleteFile($file);
 
         return response()->json($response);
     }
@@ -47,7 +45,11 @@ class FileController extends Controller
     {
         $newFileName = $request->input('name');
 
-        $response = $this->fileService->updateFileName($newFileName, $fileId);
+        $file = File::where('file_id', $fileId)->first();
+
+        $this->authorize('fileAccess', $file);
+
+        $response = $this->fileService->updateFileName($newFileName, $file);
 
         return response()->json($response, $response['code']);
     }
@@ -56,16 +58,16 @@ class FileController extends Controller
     {
         $file = File::where('file_id', $fileId)->first();
 
-        $response = $this->fileService->downloadFile($fileId, $file);
+        $this->authorize('download', $file);
+
+        $response = $this->fileService->downloadFile($file);
 
         return response()->download($response);
     }
 
     public function index(): JsonResponse
     {
-        $user = auth()->user();
-
-        $files = File::where('user_id', $user->id)->with(['accesses.user'])->get();
+        $files = File::where('user_id', auth()->user()->id)->with(['accesses.user'])->get();
 
         $response = $this->fileService->getUserFiles($files);
 

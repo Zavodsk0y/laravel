@@ -2,6 +2,7 @@
 
 namespace App\Http\Services;
 
+use App\Exceptions\ApiException;
 use App\Models\File;
 use App\Models\FileAccess;
 use App\Models\User;
@@ -9,16 +10,12 @@ use App\Models\User;
 
 class FileAccessService
 {
-    public function addAccessToFile(File $file, User $userAccess): array
+    public function addAccessToFile(File $file, string $email): array
     {
-        $user = auth()->user();
+        $userAccess = User::where('email', $email)->first();
 
-        if ($file->user_id !== $user->id) {
-            return [
-                'success' => false,
-                'code' => 403,
-                'message' => 'Forbidden for you',
-            ];
+        if (!$userAccess) {
+            throw new ApiException(404, 'User with this email not found');
         }
 
         $existingAccess = FileAccess::where('file_id', $file->file_id)
@@ -26,27 +23,21 @@ class FileAccessService
             ->first();
 
         if ($existingAccess) {
-            return [
-                'success' => false,
-                'code' => 422,
-                'message' => 'User already has access to this file',
-            ];
+            throw new ApiException(422, 'User already has access to this file');
         }
 
-        $newAccess = new FileAccess([
+        FileAccess::create([
             'user_id' => $userAccess->id,
             'file_id' => $file->file_id,
             'type' => 'co-author'
         ]);
-
-        $newAccess->save();
 
         $fileAccesses = FileAccess::where('file_id', $file->file_id)->get();
 
         $usersWithAccess = [];
         foreach ($fileAccesses as $access) {
             $usersWithAccess[] = [
-                'fullname' => $access->user->first_name . ' ' . $access->user->last_name,
+                'fullname' => "{$access->user->first_name} {$access->user->last_name}",
                 'email' => $access->user->email,
                 'type' => $access->type,
                 'code' => 200,
@@ -57,38 +48,24 @@ class FileAccessService
             'success' => true,
             'code' => 200,
             'message' => 'Access granted',
-            'data' => $fileAccesses, // На доработке
+            'data' => $usersWithAccess,
         ];
     }
 
     public function deleteAccessToFile(File $file, string $email)
     {
-        $user = auth()->user();
-
         if (!$file) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'File not found',
-            ];
+            throw new ApiException(404, 'File not found');
         }
 
-        if ($user->email === $email) {
-            return [
-                'success' => false,
-                'code' => 403,
-                'message' => 'Forbidden to remove yourself',
-            ];
+        if (auth()->user()->email === $email) {
+            throw new ApiException(403, 'Forbidden to remove yourself');
         }
 
         $userAccess = User::where('email', $email)->first();
 
         if (!$userAccess) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'User with this email not found',
-            ];
+            throw new ApiException(404, 'User with this email not found');
         }
 
         $fileAccess = FileAccess::where('user_id', $userAccess->id)
@@ -97,11 +74,7 @@ class FileAccessService
             ->first();
 
         if (!$fileAccess) {
-            return [
-                'success' => false,
-                'code' => 404,
-                'message' => 'User is not a co-author of this file',
-            ];
+            throw new ApiException(404, 'User is not a co-author of file');
         }
 
         $fileAccess->delete();

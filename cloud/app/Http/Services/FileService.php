@@ -4,11 +4,11 @@ namespace App\Http\Services;
 
 use App\Exceptions\ApiException;
 use App\Http\Resources\FileResource;
+use App\Http\Validators\FileValidator;
 use App\Models\File;
 use App\Models\FileAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 
@@ -16,7 +16,7 @@ class FileService
 {
     public function processFile($uploadFile)
     {
-        $validationError = $this->validateFile($uploadFile);
+        $validationError = FileValidator::validateFile($uploadFile);
 
         if ($validationError) {
             return [
@@ -42,13 +42,13 @@ class FileService
 
         $uploadFile->storeAs('uploads', "$fileId.$extension");
 
-        $file = new File([
+        $file = File::create([
             'user_id' => Auth::id(),
             'file_id' => $fileId,
             'name' => $uploadFileName,
         ]);
 
-        $fileAccess = new FileAccess([
+        $fileAccess = FileAccess::create([
             'user_id' => Auth::id(),
             'file_id' => $fileId,
             'type' => 'author',
@@ -56,22 +56,13 @@ class FileService
 
         $data[] = $file;
 
-        $file->save();
-        $fileAccess->save();
-
         return FileResource::collection($data);
     }
 
-    public function deleteFile($fileId)
+    public function deleteFile($file)
     {
-        $file = File::where('file_id', $fileId)->first();
-
         if (!$file) {
             throw new ApiException(404, 'File not found');
-        }
-
-        if ($file->user_id !== Auth::id()) {
-            throw new ApiException(403, 'Forbidden for you');
         }
 
         $pathinfo = pathinfo($file->name);
@@ -89,16 +80,10 @@ class FileService
         ];
     }
 
-    public function updateFileName($newFileName, $fileId): array
+    public function updateFileName($newFileName, $file): array
     {
-        $file = File::where('file_id', $fileId)->first();
-
         if (!$file) {
             throw new ApiException(404, 'File not found');
-        }
-
-        if ($file->user_id !== Auth::id()) {
-            throw new ApiException(403, 'Forbidden for you');
         }
 
         $existingFile = File::where('name', $newFileName)
@@ -106,11 +91,7 @@ class FileService
             ->first();
 
         if ($existingFile && $existingFile->id !== $file->id) {
-            return [
-                'success' => false,
-                'code' => 422,
-                'message' => 'Name already exists',
-            ];
+            throw new ApiException(422, 'This filename already exists');
         }
 
         $ext = pathinfo($file->name, PATHINFO_EXTENSION);
@@ -124,23 +105,10 @@ class FileService
         ];
     }
 
-    public function downloadFile($fileId, $file): array|string
+    public function downloadFile($file): array|string
     {
-        $user = auth()->user();
-
         if (!$file) {
             throw new ApiException(404, 'File not found');
-        }
-
-        $access = FileAccess::where('file_id', $fileId)
-            ->where(function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                    ->orWhere('type', 'co-author');
-            })
-            ->first();
-
-        if (!$access) {
-            throw new ApiException(403, 'Forbidden for you');
         }
 
         $pathinfo = pathinfo($file->name);
@@ -224,15 +192,5 @@ class FileService
         } while ($existingFile);
 
         return $newFileName;
-    }
-
-    public function validateFile($uploadFile): string|null
-    {
-        $rules = ['file' => 'required|file|mimes:doc,pdf,docx,zip,jpeg,jpg,png|max:2048'];
-        $validator = Validator::make(['file' => $uploadFile], $rules);
-
-        return $validator->fails()
-            ? $validator->errors()->first()
-            : null;
     }
 }
